@@ -167,10 +167,11 @@ namespace APP {
 			}
 			case authorizationStateWaitOtherDeviceConfirmation::ID:
 			{
+				auto confirmation = td::td_api::move_object_as<td::td_api::authorizationStateWaitOtherDeviceConfirmation>(state);
+
 				std::cout << "authorizationStateWaitOtherDeviceConfirmation" << std::endl;
-				std::cout << "Confirm this login link on another device: "
-					<< dynamic_cast<authorizationStateWaitOtherDeviceConfirmation*>(state.get())->link_
-					<< std::endl;
+				std::cout << "Confirm this login link on another device: " << confirmation->link_ << std::endl;
+
 				return;
 			}
 			case authorizationStateWaitRegistration::ID:
