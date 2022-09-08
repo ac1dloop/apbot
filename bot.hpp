@@ -381,7 +381,7 @@ namespace APP {
 		std::string copy_command_name(TdString& str) {
 			std::string& res(str->text_);
 
-			return res.substr(1, res.find(' '));
+			return res.substr(1, res.find(' ') - 1);
 		}
 
 		TdString make_formatted_string(std::string str) {
@@ -420,6 +420,8 @@ namespace APP {
 			ss << "delpidor_id\n";
 			ss << "delpidor_name\n";
 			ss << "listpidors\n";
+			ss << "listcontacts\n";
+			ss << "listknownusers\n";
 
 			return make_formatted_string(ss.str());
 		}},
