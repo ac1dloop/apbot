@@ -22,6 +22,8 @@ namespace APP {
 
 		constexpr auto pidorbot_id = 446851068;
 		constexpr auto pidorbot_message = "\xd0\xb8\xd0\xb4\xd0\xb8\x20\xd0\xbd\xd0\xb0\x20\xd1\x85\xd1\x83\xd0\xb9!!!"; //Иди на хуй на юникоде
+		constexpr auto not_contact_message = "\xd0\xbc\xd1\x8b\x20\xd0\xbd\xd0\xb5\x20\xd0\xb7\xd0\xbd\xd0\xb0\xd0\xba\xd0\xbe\xd0\xbc\xd1\x8b"; //Мы не знакомы
+		constexpr auto no_such_command_message = "\xd0\xbd\xd0\xb5\xd1\x82\x20\xd1\x82\xd0\xb0\xd0\xba\xd0\xbe\xd0\xb9\x20\xd0\xba\xd0\xbe\xd0\xbc\xd0\xb0\xd0\xbd\xd0\xb4\xd1\x8b"; //Нет такой команды
 		constexpr auto update_interval = 10;
 
 	} //CONST
@@ -73,7 +75,7 @@ namespace APP {
 					std::cout << "tdlib version " << optionValue->value_ << '\n';
 			});
 
-			auto txt = make_formatted_string(u8"Иди на хуй!!!");
+			auto txt = make_formatted_string(CONST::pidorbot_message);
 
 			known_pidors[CONST::pidorbot_id] = std::move(txt);
 		}
@@ -307,14 +309,14 @@ namespace APP {
 					return;
 
 				if (!known_user->second->is_contact_)
-					return replyToMesageWithText(std::move(message), make_formatted_string(u8"мы не знакомы"));
+					return replyToMesageWithText(std::move(message), make_formatted_string(CONST::not_contact_message));
 
 				auto command_text = copy_command_name(form_text);
 
 				auto cmd_handler = command_handlers.find(command_text);
 
 				if (cmd_handler == command_handlers.end())
-					return replyToMesageWithText(std::move(message), make_formatted_string(u8"нет такой команды"));
+					return replyToMesageWithText(std::move(message), make_formatted_string(CONST::no_such_command_message));
 
 				auto res_text = cmd_handler->second(std::move(form_text));
 
