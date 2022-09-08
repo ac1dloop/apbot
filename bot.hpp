@@ -20,16 +20,6 @@ namespace APP {
 	//Compile time constants
 	namespace CONST {
 
-		//tdlib settings
-		constexpr auto tg_api_id = 7809655;
-		constexpr std::string_view tg_api_hash = "1de39b873d05798b88ce9e49e5f6dfba";
-		constexpr auto db_dir = "tdlib";
-		constexpr auto files_dir = "dl";
-		constexpr auto system_lang = "en";
-		constexpr auto app_ver = "1.0";
-		constexpr auto device_model = "Raspberry pi";
-		constexpr auto system_version = "Linux"; 
-
 		constexpr auto pidorbot_id = 446851068;
 		constexpr auto pidorbot_message = "\xd0\xb8\xd0\xb4\xd0\xb8\x20\xd0\xbd\xd0\xb0\x20\xd1\x85\xd1\x83\xd0\xb9!!!"; //Иди на хуй на юникоде
 		constexpr auto update_interval = 10;
@@ -37,6 +27,22 @@ namespace APP {
 	} //CONST
 
 	struct Bot {
+
+		struct Settings {
+
+			explicit Settings(int api_id, auto api_hash):api_id(api_id), api_hash(api_hash) {}
+
+			//tdlib settings
+			int api_id = 0;
+			std::string api_hash = "";
+			std::string db_dir = "tdlib";
+			std::string files_dir = "dl";
+			std::string system_lang = "en";
+			std::string app_ver = "1.0";
+			std::string device_model = "Raspberry pi";
+			std::string system_version = "Linux";
+
+		} settings;
 
 		//all classes inherited from Object in this lib
 		using Object = td::td_api::object_ptr<td::td_api::Object>;
@@ -54,9 +60,9 @@ namespace APP {
 		using ChatId = td::td_api::int53;
 		using UserId = td::td_api::int53;
 
-		explicit Bot(int log_verbosity = 0) {
+		explicit Bot(int api_id, std::string api_hash) :settings{ api_id, api_hash } {
 
-			td::ClientManager::execute(td::td_api::make_object<td::td_api::setLogVerbosityLevel>(log_verbosity));
+			td::ClientManager::execute(td::td_api::make_object<td::td_api::setLogVerbosityLevel>(0));
 
 			client_id = client_manager->create_client_id();
 
@@ -125,17 +131,17 @@ namespace APP {
 			{
 				std::cout << "authorizationStateWaitTdlibParameters" << std::endl;
 				auto parameters = make_object<tdlibParameters>();
-				parameters->database_directory_ = CONST::db_dir;
-				parameters->files_directory_ = CONST::files_dir; //downloads folder
+				parameters->database_directory_ = settings.db_dir;
+				parameters->files_directory_ = settings.files_dir; //downloads folder
 				parameters->use_file_database_ = true;
 				parameters->use_chat_info_database_ = true;
 				parameters->use_message_database_ = true;
-				parameters->api_id_ = CONST::tg_api_id;
-				parameters->api_hash_ = CONST::tg_api_hash;
-				parameters->system_language_code_ = CONST::system_lang;
-				parameters->device_model_ = CONST::device_model;
-				parameters->application_version_ = CONST::app_ver;
-				parameters->system_version_ = CONST::system_version;
+				parameters->api_id_ = settings.api_id;
+				parameters->api_hash_ = settings.api_hash;
+				parameters->system_language_code_ = settings.system_lang;
+				parameters->device_model_ = settings.device_model;
+				parameters->application_version_ = settings.app_ver;
+				parameters->system_version_ = settings.system_version;
 				parameters->enable_storage_optimizer_ = true;
 				make_request(make_object<setTdlibParameters>(std::move(parameters)));
 				return;
