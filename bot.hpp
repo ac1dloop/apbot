@@ -448,8 +448,8 @@ namespace APP {
 			auto fsp = s.find(' ');
 			auto fsp2 = s.find(' ', fsp + 1);
 
-			auto& second = s.substr(fsp + 1, fsp2 - fsp - 1);
-			auto& last = s.substr(fsp2 + 1, std::string::npos);
+			auto second = s.substr(fsp + 1, fsp2 - fsp - 1);
+			auto last = s.substr(fsp2 + 1, std::string::npos);
 
 			UserId id;
 
@@ -473,8 +473,8 @@ namespace APP {
 			auto fsp = s.find(' ');
 			auto fsp2 = s.find(' ', fsp + 1);
 
-			auto& name = s.substr(fsp + 1, fsp2 - fsp - 1);
-			auto& pidor_text = s.substr(fsp2 + 1, std::string::npos);
+			auto name = s.substr(fsp + 1, fsp2 - fsp - 1);
+			auto pidor_text = s.substr(fsp2 + 1, std::string::npos);
 
 			UserId uid = 0;
 
@@ -516,7 +516,7 @@ namespace APP {
 
 			UserId uid;
 
-			auto& name = s.substr(s.find(' ') + 1, std::string::npos);
+			auto name = s.substr(s.find(' ') + 1, std::string::npos);
 
 			for (const auto& [id, user] : known_users) {
 				if (user->username_ == name) {
