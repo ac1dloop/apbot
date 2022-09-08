@@ -28,9 +28,27 @@ namespace APP {
 
 	struct Bot {
 
+		//all classes inherited from Object in this lib
+		using Object = td::td_api::object_ptr<td::td_api::Object>;
+		using Update = td::td_api::object_ptr<td::td_api::Update>;
+		using Request = td::td_api::object_ptr<td::td_api::Function>;
+		using Error = td::td_api::object_ptr<td::td_api::error>;
+		using Response = td::ClientManager::Response;
+		using ReplyMessage = td::td_api::object_ptr<td::td_api::sendMessage>;
+		using TdString = td::td_api::object_ptr<td::td_api::formattedText>;
+		using CommandHandler = std::function<TdString(TdString)>;
+		using inputMessage = td::td_api::object_ptr<td::td_api::message>;
+
+		using ResponseHandler = std::function<void(Object)>;
+		using ClientId = td::ClientManager::ClientId;
+		using MessageSender = td::td_api::object_ptr <td::td_api::MessageSender>;
+		using BotId = td::td_api::int53;
+		using ChatId = td::td_api::int53;
+		using UserId = td::td_api::int53;
+
 		struct Settings {
 
-			explicit Settings(int api_id, auto api_hash):api_id(api_id), api_hash(api_hash) {}
+			explicit Settings(int api_id, std::string api_hash) :api_id(api_id), api_hash(api_hash) {}
 
 			//tdlib settings
 			int api_id = 0;
@@ -44,22 +62,6 @@ namespace APP {
 
 		} settings;
 
-		//all classes inherited from Object in this lib
-		using Object = td::td_api::object_ptr<td::td_api::Object>;
-		using Update = td::td_api::object_ptr<td::td_api::Update>;
-		using Request = td::td_api::object_ptr<td::td_api::Function>;
-		using Error = td::td_api::object_ptr<td::td_api::error>;
-		using Response = td::ClientManager::Response;
-		using ReplyMessage = td::td_api::object_ptr<td::td_api::sendMessage>;
-		using CommandHandler = std::function<std::optional<std::string>(std::string)>;
-
-		using ResponseHandler = std::function<void(Object)>;
-		using ClientId = td::ClientManager::ClientId;
-		using MessageSender = td::td_api::object_ptr <td::td_api::MessageSender>;
-		using BotId = td::td_api::int53;
-		using ChatId = td::td_api::int53;
-		using UserId = td::td_api::int53;
-
 		explicit Bot(int api_id, std::string api_hash) :settings{ api_id, api_hash } {
 
 			td::ClientManager::execute(td::td_api::make_object<td::td_api::setLogVerbosityLevel>(0));
@@ -70,6 +72,10 @@ namespace APP {
 					auto optionValue = td::td_api::move_object_as<td::td_api::optionValueString>(obj);
 					std::cout << "tdlib version " << optionValue->value_ << '\n';
 			});
+
+			auto txt = make_formatted_string(u8"Иди на хуй!!!");
+
+			known_pidors[CONST::pidorbot_id] = std::move(txt);
 		}
 
 		~Bot() {}
@@ -115,7 +121,7 @@ namespace APP {
 
 		void process_response(Response resp) {
 			auto it = handlers.find(resp.request_id);
-
+			
 			if (it != handlers.end()) {
 				it->second(std::move(resp.object));
 				handlers.erase(it);//may be not optimal
@@ -268,109 +274,56 @@ namespace APP {
 		void process_input_message(td::td_api::object_ptr<td::td_api::message> message) {
 			auto sender = td::td_api::move_object_as<td::td_api::MessageSender>(message->sender_id_);
 
-			if (sender->get_id() != td::td_api::messageSenderUser::ID) {
-				//message from chat
-				//ignoring...
+			//message from chat
+			if (sender->get_id() != td::td_api::messageSenderUser::ID)
 				return;
-			}
 
 			//get id
 			auto sender_user = td::td_api::move_object_as<td::td_api::messageSenderUser>(sender);
 
-			auto known_user = known_users.find(sender_user->user_id_);
+			//handle pidor
+			if (known_pidors.find(sender_user->user_id_) != known_pidors.end()) {
+				auto reply = make_formatted_string(known_pidors[sender_user->user_id_]->text_);
 
-			if (known_user == known_users.end()) {
-				//cannot process message
-				return;
-			}
-
-			//test if pidor
-			auto pidor = known_pidors.find(sender_user->user_id_);
-
-			if (pidor != known_pidors.end()) {
-				//process pidor
-
-				auto send_message = td::td_api::make_object<td::td_api::sendMessage>();
-
-				send_message->reply_to_message_id_ = message->id_;
-				send_message->chat_id_ = message->chat_id_;
-
-				//message settings
-				//auto message_settings = td::td_api::make_object<td::td_api::messageSendOptions>();
-				//message_settings->disable_notification_ = true;
-				//message_settings->from_background_ = true;
-				//message_settings->protect_content_ = true;
-				//send_message->options_ = std::move(message_settings);
-
-				//actual content of message
-				auto message_content = td::td_api::make_object<td::td_api::inputMessageText>();
-				message_content->text_ = td::td_api::make_object<td::td_api::formattedText>();
-				message_content->text_->text_ = pidor->second;
-
-				send_message->input_message_content_ = std::move(message_content);
-
-				make_request(std::move(send_message));
-
-				return;
+				replyToMesageWithText(std::move(message), std::move(reply));
 			}
 
 			//now we care about content
 			auto message_content = std::move(message->content_);
 
 			//can process only text
-			if (message_content->get_id() != td::td_api::messageText::ID) {
+			if (message_content->get_id() != td::td_api::messageText::ID)
 				return;
-			}
 
 			auto text_content = td::td_api::move_object_as<td::td_api::messageText>(message_content);
 			auto form_text = std::move(text_content->text_);
 
-			std::string str = form_text->text_;
+			//command starts with '/'
+			if (form_text->text_.at(0) == '/') {
 
-			//test if command
-			if (str.size() != 0 && str.at(0) == '/') {
+				auto known_user = known_users.find(sender_user->user_id_);
 
-				std::optional<std::string> cmd_result{ "unauthorized" };
-
-				if (known_user->second->is_contact_)
-					cmd_result = process_command(str);
-
-				if (!cmd_result.has_value())
+				if (known_user == known_users.end())
 					return;
 
-				auto send_message = td::td_api::make_object<td::td_api::sendMessage>();
+				if (!known_user->second->is_contact_)
+					return replyToMesageWithText(std::move(message), make_formatted_string(u8"мы не знакомы"));
 
-				send_message->reply_to_message_id_ = message->id_;
-				send_message->chat_id_ = message->chat_id_;
+				auto command_text = copy_command_name(form_text);
 
-				//actual content of message
-				auto message_content = td::td_api::make_object<td::td_api::inputMessageText>();
-				message_content->text_ = td::td_api::make_object<td::td_api::formattedText>();
-				message_content->text_->text_ = cmd_result.value();
+				auto cmd_handler = command_handlers.find(command_text);
 
-				send_message->input_message_content_ = std::move(message_content);
+				if (cmd_handler == command_handlers.end())
+					return replyToMesageWithText(std::move(message), make_formatted_string(u8"нет такой команды"));
 
-				make_request(std::move(send_message));
+				auto res_text = cmd_handler->second(std::move(form_text));
 
-				return;
+				return replyToMesageWithText(std::move(message), std::move(res_text));
 			}
 
 			//else append to pseudohistory
 			text_messages[text_messages_index % text_messages.size()] = std::move(form_text);
 			text_messages_index++;
-		}
-
-		std::optional<std::string> process_command(std::string str) {
-			//ignore starting slash
-			auto fsp = str.find(' ');
-			auto command = str.substr(1, fsp - 1);
-
-			auto cmd_iter = command_handlers.find(command);
-
-			if (cmd_iter == command_handlers.end())
-				return {};
-
-			return cmd_iter->second(str.substr(fsp + 1, std::string::npos));
 		}
 
 		void make_request(Request req, ResponseHandler handler) {
@@ -380,6 +333,61 @@ namespace APP {
 
 		void make_request(Request req) {
 			client_manager->send(client_id, ++request_id, std::move(req));
+		}
+
+		void replyToMesageWithText(inputMessage msg, TdString str){
+			//send message to pidor
+			auto send_message = td::td_api::make_object<td::td_api::sendMessage>();
+
+			send_message->reply_to_message_id_ = msg->id_;
+			send_message->chat_id_ = msg->chat_id_;
+
+			//message settings
+			//auto message_settings = td::td_api::make_object<td::td_api::messageSendOptions>();
+			//message_settings->disable_notification_ = true;
+			//message_settings->from_background_ = true;
+			//message_settings->protect_content_ = true;
+			//send_message->options_ = std::move(message_settings);
+
+			//actual content of message
+			auto message_content = td::td_api::make_object<td::td_api::inputMessageText>();
+			message_content->text_ = std::move(str);
+
+			send_message->input_message_content_ = std::move(message_content);
+
+			make_request(std::move(send_message));
+		}
+
+		bool delPidor(UserId id) {
+			auto it = known_pidors.find(id);
+
+			if (it != known_pidors.end())
+				known_pidors.erase(it);
+
+			return false; //because 'nothing to do' is correct result
+		}
+
+		bool delPidor(const std::string& username) {
+			for (const auto& [id, user] : known_users) {
+				if (user->username_ == username)
+					return delPidor(id);
+			}
+
+			return false;
+		}
+
+		std::string copy_command_name(TdString& str) {
+			std::string& res(str->text_);
+
+			return res.substr(1, res.find(' '));
+		}
+
+		TdString make_formatted_string(std::string str) {
+			TdString res = td::td_api::make_object<td::td_api::formattedText>();
+
+			res->text_ = std::move(str);
+
+			return std::move(res);
 		}
 
 		//Api
@@ -396,59 +404,78 @@ namespace APP {
 		std::unordered_map<UserId, td::td_api::object_ptr<td::td_api::user> > known_users;
 
 		//Logic
-		std::unordered_map<UserId, std::string> known_pidors{
-			{CONST::pidorbot_id, CONST::pidorbot_message}
-		};
+		std::unordered_map<UserId, TdString> known_pidors;
 
 		std::unordered_map<std::string, CommandHandler> command_handlers
 		{
-		{"help", [](std::string) {
-				std::stringstream ss;
+		{"help", [this](TdString str) {
+			std::stringstream ss;
 
-				ss << "help - get help\n";
-				ss << "setloglevel - flood console\n";
-				ss << "addpidor_id [id] [text] - add pidor to hatelist\n";
-				ss << "addpidor_name [username] [text]\n";
-				ss << "delpidor_id\n";
-				ss << "delpidor_name\n";
-				ss << "listpidors\n";
+			ss << "help - get help\n";
+			ss << "setloglevel - flood console\n";
+			ss << "addpidor_id [id] [text] - add pidor to hatelist\n";
+			ss << "addpidor_name [username] [text]\n";
+			ss << "delpidor_id\n";
+			ss << "delpidor_name\n";
+			ss << "listpidors\n";
 
-				return ss.str();
+			return make_formatted_string(ss.str());
 		}},
-		{"setloglevel", [this](std::string str) {
+		{"setloglevel",[this](TdString str){
 				int lvl;
 
+				TdString res{ make_formatted_string("failed") };
+
+				auto& s = str->text_;
+
 				try {
-					lvl = std::stoi(str);
+					lvl = std::stoi(s.substr(s.find(' ') + 1, std::string::npos));
 				}
 				catch (...) {
-					return "failed";
+					return res;
 				}
 
 				td::ClientManager::execute(td::td_api::make_object<td::td_api::setLogVerbosityLevel>(lvl));
 
-				return "success";
+				res->text_ = "success";
+				return res;
 		}},
-		{"addpidor_id", [this](std::string str) {
-			auto fsp = str.find(' ');
+		{"addpidor_id",[this](TdString str) {
+			TdString res = make_formatted_string("failed");
+
+			std::string& s = str->text_;
+
+			auto fsp = s.find(' ');
+			auto fsp2 = s.find(' ', fsp + 1);
+
+			auto& second = s.substr(fsp + 1, fsp2 - fsp - 1);
+			auto& last = s.substr(fsp2 + 1, std::string::npos);
 
 			UserId id;
 
 			try {
-				id = std::stoll(str.substr(0, fsp));
+				id = std::stoll(second);
 			}
 			catch (...) {
-				return "failed";
+				return res;
 			}
 
-			known_pidors[id] = str.substr(fsp + 1, std::string::npos);
+			known_pidors[id] = make_formatted_string(last);
 
-			return "success";
+			res->text_ = "success";
+			return res;
 		}},
-		{"addpidor_name", [this](std::string str) {
-			auto fsp = str.find(' ');
+		{"addpidor_name",[this](TdString str) {
+			TdString res = make_formatted_string("failed");
 
-			auto name = str.substr(0, fsp);
+			std::string& s = str->text_;
+
+			auto fsp = s.find(' ');
+			auto fsp2 = s.find(' ', fsp + 1);
+
+			auto& name = s.substr(fsp + 1, fsp2 - fsp - 1);
+			auto& pidor_text = s.substr(fsp2 + 1, std::string::npos);
+
 			UserId uid = 0;
 
 			for (const auto& [id, user] : known_users) {
@@ -459,36 +486,37 @@ namespace APP {
 			}
 
 			if (uid == 0)
-				return "failed";
+				return res;
 
-			known_pidors[uid] = str.substr(fsp + 1, std::string::npos);
-
-			return "success";
+			known_pidors[uid] = make_formatted_string(pidor_text);
+			res->text_ = "success";
+			return res;
 		}},
-		{"delpidor_id", [this](std::string str) {
-			auto fsp = str.find(' ');
+		{"delpidor_id",[this](TdString str) {
+			TdString res = make_formatted_string("failed");
+
+			std::string& s = str->text_;
 
 			UserId id;
 
 			try {
-				id = std::stoll(str.substr(0, fsp));
+				id = std::stoll(s.substr(s.find(' ') + 1, std::string::npos));
 			}
 			catch (...) {
-				return "failed";
+				return res;
 			}
 
-			auto pidor_it = known_pidors.find(id);
-
-			if (pidor_it != known_pidors.end())
-				known_pidors.erase(pidor_it);
-
-			return "success"; 
+			res->text_ = "success";
+			return res;
 		}},
-		{"delpidor_name", [this](std::string str) {
-			auto fsp = str.find(' ');
+		{"delpidor_name",[this](TdString str) {
+			TdString res = make_formatted_string("failed");
 
-			auto name = str.substr(0, fsp);
-			UserId uid = 0;
+			std::string& s = str->text_;
+
+			UserId uid;
+
+			auto& name = s.substr(s.find(' ') + 1, std::string::npos);
 
 			for (const auto& [id, user] : known_users) {
 				if (user->username_ == name) {
@@ -498,17 +526,17 @@ namespace APP {
 			}
 
 			if (uid == 0)
-				return "failed";
+				return res;
 
 			auto pidor_it = known_pidors.find(uid);
 
 			if (pidor_it != known_pidors.end())
 				known_pidors.erase(pidor_it);
 
-			return "success";
+			res->text_ = "success";
+			return res;
 		}},
-			
-		{"listpidors", [this](std::string str) {
+		{"listpidors",[this](TdString str) {
 				std::stringstream ss;
 
 				int i{1};
@@ -524,11 +552,31 @@ namespace APP {
 						ss << id;
 					}
 
-					ss << " [" << text << "]\n";
+					ss << " [" << text->text_ << "]\n";
 				}
 
-				return ss.str();
+				return make_formatted_string(ss.str());
 		}},
+		{"listcontacts",[this](TdString str) {
+			std::stringstream ss;
+
+			int i{ 1 };
+			for (const auto& [id, user] : known_users) {
+				if (user->is_contact_)
+					ss << i++ << ": " << user->username_ << " " << user->id_ << '\n';
+			}
+
+			return make_formatted_string(ss.str());
+		}},
+		{"listknownusers",[this](TdString str) {
+			std::stringstream ss;
+
+			int i{ 1 };
+			for (const auto& [id, user] : known_users)
+				ss << i++ << ": " << user->username_ << " " << user->id_ << '\n';
+
+			return make_formatted_string(ss.str());
+		}}
 		};
 
 		std::array< td::td_api::object_ptr<td::td_api::formattedText>, 3> text_messages; // pseudohistory

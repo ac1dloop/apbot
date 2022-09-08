@@ -2,7 +2,7 @@
 cmake_minimum_required (VERSION 3.14)
 project ("antipidorbot" VERSION 1.0.0.0 LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
 
 # in windows for dependency management vcpkg is used
 # however it's not working sometimes so paths provided manually
